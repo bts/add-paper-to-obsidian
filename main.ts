@@ -7,22 +7,11 @@ import {
 	Setting,
 } from "obsidian";
 import * as yaml from 'js-yaml';
-import { stopwords } from "./english-stopwords";
 
 const path = require("path");
 
-const NAMING_TYPES: string[] = [
-	"identifier",
-	"first-3-title-terms",
-	"first-3-title-terms-no-stopwords",
-	"first-5-title-terms",
-	"first-5-title-terms-no-stopwords",
-	"all-title-terms",
-];
-
 const DEFAULT_SETTINGS: PaperNoteFillerPluginSettings = {
 	folderLocation: "",
-	fileNaming: NAMING_TYPES[0],
 };
 
 //create a string map for all the strings we need
@@ -52,8 +41,6 @@ const STRING_MAP: Map<string, string> = new Map([
 	["settingFolderName", "Folder"],
 	["settingFolderDesc", "Folder to create paper notes in."],
 	["settingFolderRoot", "(root of the vault)"],
-	["settingNoteName", "Note naming"],
-	["settingNoteDesc", "Method to name the note."],
 	["noticeRetrievingArxiv", "Retrieving paper information from arXiv API."],
 	["noticeRetrievingSS", "Retrieving paper information from Semantic Scholar API."],
 ]);
@@ -70,7 +57,6 @@ function trimString(str: string | null): string {
 
 interface PaperNoteFillerPluginSettings {
 	folderLocation: string;
-	fileNaming: string;
 }
 
 export default class PaperNoteFillerPlugin extends Plugin {
@@ -137,37 +123,13 @@ class urlModal extends Modal {
 		return url.split("/").slice(-1)[0];
 	}
 
-	extractFileNameFromUrl(url: string, title: string): string {
-
-		let filename = this.getIdentifierFromUrl(url);
-
-		if (this.settings.fileNaming !== "identifier" &&
-			title != null) {
-			let sliceEnd = undefined; //default to all terms
-			if (this.settings.fileNaming.includes(
-				"first-3-title-terms"
-			))
-				sliceEnd = 3;
-			else if (this.settings.fileNaming.includes(
-				"first-5-title-terms"
-			))
-				sliceEnd = 5;
-			else
-				;
-
-			filename = title
-				.split(" ")
-				.filter(
-					(word) => !stopwords.has(word.toLowerCase()) ||
-						!this.settings.fileNaming.includes(
-							"no-stopwords"
-						)
-				)
-				.slice(0, sliceEnd)
-				.join(" ")
-				.replace(/[^a-zA-Z0-9 ]/g, "");
-		}
-		return filename;
+	buildNoteName(title: string): string {
+		// No backslashes, forward slashes, or colons in filenames
+    return title
+        .replace(/[\/\\]/g, "_")
+				// Replace "Foo: bar" with "Foo – bar" (em-dash)
+        .replace(/: /g, " – ")
+        .replace(/:/g, "-");
 	}
 
 	//both arxiv and aclanthology papers can be queried via the Semantic Scholar API
@@ -202,7 +164,7 @@ class urlModal extends Modal {
 					return;
 				}
 
-				let title = json.title;
+				const title = compressWhitespace(json.title ?? 'undefined');
 				let maybeAbstract: string | null = json.abstract ?? null;
 
 				const authors = json.authors.map((author: any) => author.name);
@@ -214,8 +176,8 @@ class urlModal extends Modal {
 
 				let maybeDate: string | null = json.publicationDate ?? null;
 
-				if (title == null) title = "undefined";
-				let filename = this.extractFileNameFromUrl(url, title);
+				let basename = this.buildNoteName(title);
+				const maybeAlias: string | null = basename !== title ? title : null;
 
 				let semanticScholarURL = json.url;
 				if (json["externalIds"] && json["externalIds"]["ArXiv"]) {
@@ -227,7 +189,7 @@ class urlModal extends Modal {
 
 				let pathToFile = this.settings.folderLocation +
 					path.sep +
-					filename +
+					basename +
 					".md";
 
 				//notification if the file already exists
@@ -242,7 +204,7 @@ class urlModal extends Modal {
 				} else {
 					await this.app.vault.create(
 							pathToFile,
-							this.buildNoteBody(title, authors, semanticScholarURL, null /* discoveredVia */, maybeVenue, maybeDate, maybeAbstract)
+							this.buildNoteBody(maybeAlias, authors, semanticScholarURL, null /* discoveredVia */, maybeVenue, maybeDate, maybeAbstract)
 						)
 						.then(() => {
 							this.app.workspace.openLinkText(
@@ -263,8 +225,9 @@ class urlModal extends Modal {
 			});
 	}
 
+	// TODO(bts): take a params object
 	buildNoteBody(
-			title: string,
+			maybeAlias: string | null,
 			authors: string[],
 			url: string,
 			maybeDiscoveredVia: string | null,
@@ -275,7 +238,6 @@ class urlModal extends Modal {
 			const todayDatestamp = new Date().toISOString().split('T')[0];
 
 			const frontmatter: any = {
-					alias: compressWhitespace(title),
 					created_at: todayDatestamp,
 					url,
 					authors: authors.map((author: string) => `[[${author}]]`),
@@ -283,6 +245,7 @@ class urlModal extends Modal {
 			};
 
 			// Optional fields
+			if (maybeAlias) frontmatter.alias = maybeAlias;
 			if (maybeDiscoveredVia) frontmatter.discovered_via = maybeDiscoveredVia;
 			if (maybeVenue) frontmatter.publication_venue = trimString(maybeVenue);
 			if (maybeDate) frontmatter.date = maybeDate;
@@ -313,8 +276,7 @@ ${maybeAbstract ? maybeAbstract.trim() : ''}
 				let parser = new DOMParser();
 				let xmlDoc = parser.parseFromString(data, "text/xml");
 
-				let title =
-					xmlDoc.getElementsByTagName("title")[1].textContent;
+				const title = compressWhitespace(xmlDoc.getElementsByTagName("title")[1].textContent ?? 'undefined');
 				let maybeAbstract = xmlDoc.getElementsByTagName("summary")[0].textContent;
 				const authorObjs = Array.from(xmlDoc.getElementsByTagName("author"));
 				const authorNames: string[] = authorObjs
@@ -324,12 +286,12 @@ ${maybeAbstract ? maybeAbstract.trim() : ''}
 				let maybeDate: string | null = xmlDoc.getElementsByTagName("published")[0].textContent;
 				if (maybeDate) maybeDate = maybeDate.split("T")[0]; // datestamp
 
-				if (title == null) title = "undefined";
-				let filename = this.extractFileNameFromUrl(url, title);
+				const basename = this.buildNoteName(title);
+				const maybeAlias: string | null = basename !== title ? title : null;
 
 				let pathToFile = this.settings.folderLocation +
 					path.sep +
-					filename +
+					basename +
 					".md";
 
 				//notification if the file already exists
@@ -344,7 +306,7 @@ ${maybeAbstract ? maybeAbstract.trim() : ''}
 				} else {
 					await this.app.vault.create(
 							pathToFile,
-							this.buildNoteBody(title, authorNames, url, null /* discoveredVia */, maybeVenue, maybeDate, maybeAbstract)
+							this.buildNoteBody(maybeAlias, authorNames, url, null /* discoveredVia */, maybeVenue, maybeDate, maybeAbstract)
 						)
 						.then(() => {
 							this.app.workspace.openLinkText(
@@ -452,11 +414,6 @@ class SettingTab extends PluginSettingTab {
 		//also add the root folder
 		folderOptions[""] = STRING_MAP.get("settingFolderRoot")!;
 
-		let namingOptions: Record<string, string> = {};
-		NAMING_TYPES.forEach((record) => {
-			namingOptions[record] = record;
-		});
-
 		new Setting(containerEl)
 			.setName(STRING_MAP.get("settingFolderName")!)
 			.setDesc(STRING_MAP.get("settingFolderDesc")!)
@@ -467,18 +424,6 @@ class SettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.folderLocation)
 					.onChange(async (value) => {
 						this.plugin.settings.folderLocation = value;
-						await this.plugin.saveSettings();
-					})
-			);
-		new Setting(containerEl)
-			.setName(STRING_MAP.get("settingNoteName")!)
-			.setDesc(STRING_MAP.get("settingNoteDesc")!)
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOptions(namingOptions)
-					.setValue(this.plugin.settings.fileNaming)
-					.onChange(async (value) => {
-						this.plugin.settings.fileNaming = value;
 						await this.plugin.saveSettings();
 					})
 			);
