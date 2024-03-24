@@ -8,11 +8,11 @@ Instead of manually creating one [Obsidian](https://obsidian.md/) note per paper
 
 This (mostly) works for paper URLs from three domains:
 
-- arxiv.org, e.g. https://arxiv.org/abs/2111.13057 
+- arxiv.org, e.g. https://arxiv.org/abs/2111.13057
 - aclanthology, e.g. https://aclanthology.org/2022.acl-long.3/
 - semantischolar, e.g. https://www.semanticscholar.org/paper/Feature-Engineering-for-Second-Language-Acquisition-Chen-Hauff/75033c495638dcb2fb8ebc6211e5e5e0e8b93ea6
 
-If it is an arxiv paper, the ArXiv API is queried. The ACL Anthology isn't as simple to query, and since Semantic Scholar has most of the data ingested, the [Semantic Scholar API](https://www.semanticscholar.org/product/api) is queried with the respective aclanthology/semanticscholar identifier. 
+If it is an arxiv paper, the ArXiv API is queried. The ACL Anthology isn't as simple to query, and since Semantic Scholar has most of the data ingested, the [Semantic Scholar API](https://www.semanticscholar.org/product/api) is queried with the respective aclanthology/semanticscholar identifier.
 
 _Why querying ArXiv separately? Although Semantic Scholar also ingests papers posted on ArXiv I have found the ingested data to be more noisy (especially when it comes to the abstract) than ArXiv's version._
 
@@ -59,3 +59,8 @@ Press <kbd>Enter</kbd> and a note with the paper title, authors, url, abstract, 
 ## Developing it further
 
 Not hard as the plugin is straightforward and just a few hundred lines of code. Check out the instructions of the [Obsidian Sample Plugin repo](https://github.com/obsidianmd/obsidian-sample-plugin) to get started.
+
+- make sure all packages are installed via `npm install`
+- build in development with a watcher via `node esbuild.config.mjs`
+- build for release via `node esbuild.config.mjs production`
+- deploy to Obsidian, for a vault at e.g. `~/Documents/Notes`, via `cp main.js styles.css manifest.json ~/Documents/Notes/.obsidian/plugins/paper-note-filler`
