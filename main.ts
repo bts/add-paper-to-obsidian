@@ -199,7 +199,7 @@ class urlModal extends Modal {
 				}
 
 				let title = json.title;
-				let abstract = json.abstract;
+				let maybeAbstract: string | null = json.abstract ?? null;
 
 				let authors = json.authors;
 				let authorString = "";
@@ -210,11 +210,12 @@ class urlModal extends Modal {
 					authorString += authors[i].name;
 				}
 
-				let venue = "";
-				if (json.venue != null && json.venue != "")
-					venue = json.venue + " " + json.year;
+				let maybeVenue: string | null = null;
+				if (json.venue != null && json.venue != "") {
+					maybeVenue = json.venue + " " + json.year;
+				}
 
-				let publicationDate = json.publicationDate;
+				let maybeDate: string | null = json.publicationDate ?? null;
 
 				if (title == null) title = "undefined";
 				let filename = this.extractFileNameFromUrl(url, title);
@@ -242,37 +243,9 @@ class urlModal extends Modal {
 						pathToFile
 					);
 				} else {
-					await this.app.vault
-						.create(
+					await this.app.vault.create(
 							pathToFile,
-							"# Title" +
-							"\n" +
-							trimString(title) +
-							"\n\n" +
-							"# Authors" +
-							"\n" +
-							trimString(authorString) +
-							"\n\n" +
-							"# URL" +
-							"\n" +
-							semanticScholarURL +
-							"\n\n" +
-							"# Venue" +
-							"\n" +
-							trimString(venue) +
-							"\n\n" +
-							"# Publication date" +
-							"\n" +
-							trimString(publicationDate) +
-							"\n\n" +
-							"# Abstract" +
-							"\n" +
-							trimString(abstract) +
-							"\n\n" +
-							"# Tags" +
-							"\n\n\n" +
-							"# Notes" +
-							"\n"
+							this.buildNoteBody(title, authorString, semanticScholarURL, maybeVenue, maybeDate, maybeAbstract)
 						)
 						.then(() => {
 							this.app.workspace.openLinkText(
@@ -293,6 +266,36 @@ class urlModal extends Modal {
 			});
 	}
 
+	buildNoteBody(title: string, authorString: string, url: string, maybeVenue: string | null, maybeDate: string | null, maybeAbstract: string | null): string {
+		return "# Title" +
+			"\n" +
+			trimString(title) +
+			"\n\n" +
+			"# Authors" +
+			"\n" +
+			trimString(authorString) +
+			"\n\n" +
+			"# URL" +
+			"\n" +
+			trimString(url) +
+			"\n\n" +
+			"# Venue" +
+			"\n" +
+			trimString(maybeVenue) +
+			"\n\n" +
+			"# Publication date" +
+			"\n" +
+			trimString(maybeDate) +
+			"\n\n" +
+			"# Abstract" +
+			"\n" +
+			trimString(maybeAbstract) +
+			"\n\n" +
+			"# Tags" +
+			"\n\n" +
+			"# Notes" +
+			"\n\n";
+	}
 
 	//if semantic scholar misses, we try arxiv
 	extractFromArxiv(url: string) {
@@ -308,9 +311,7 @@ class urlModal extends Modal {
 
 				let title =
 					xmlDoc.getElementsByTagName("title")[1].textContent;
-				let abstract =
-					xmlDoc.getElementsByTagName("summary")[0]
-						.textContent;
+				let maybeAbstract = xmlDoc.getElementsByTagName("summary")[0].textContent;
 				let authors = xmlDoc.getElementsByTagName("author");
 				let authorString = "";
 				for (let i = 0; i < authors.length; i++) {
@@ -321,10 +322,11 @@ class urlModal extends Modal {
 						authors[i].getElementsByTagName("name")[0]
 							.textContent;
 				}
-				let date =
+				let maybeVenue = null;
+				let maybeDate: string | null =
 					xmlDoc.getElementsByTagName("published")[0]
 						.textContent;
-				if (date) date = date.split("T")[0]; //make the date human-friendly
+				if (maybeDate) maybeDate = maybeDate.split("T")[0]; //make the date human-friendly
 
 				if (title == null) title = "undefined";
 				let filename = this.extractFileNameFromUrl(url, title);
@@ -344,35 +346,9 @@ class urlModal extends Modal {
 						pathToFile
 					);
 				} else {
-					await this.app.vault
-						.create(
+					await this.app.vault.create(
 							pathToFile,
-							"# Title" +
-							"\n" +
-							trimString(title) +
-							"\n\n" +
-							"# Authors" +
-							"\n" +
-							trimString(authorString) +
-							"\n\n" +
-							"# URL" +
-							"\n" +
-							trimString(url) +
-							"\n\n" +
-							"# Venue" +
-							"\n\n\n" +
-							"# Publication date" +
-							"\n" +
-							trimString(date) +
-							"\n\n" +
-							"# Abstract" +
-							"\n" +
-							trimString(abstract) +
-							"\n\n" +
-							"# Tags" +
-							"\n\n" +
-							"# Notes" +
-							"\n\n"
+							this.buildNoteBody(title, authorString, url, maybeVenue, maybeDate, maybeAbstract)
 						)
 						.then(() => {
 							this.app.workspace.openLinkText(
