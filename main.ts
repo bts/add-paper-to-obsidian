@@ -6,7 +6,7 @@ import {
 	PluginSettingTab,
 	Setting,
 } from "obsidian";
-
+import * as yaml from 'js-yaml';
 import { stopwords } from "./english-stopwords";
 
 const path = require("path");
@@ -58,10 +58,14 @@ const STRING_MAP: Map<string, string> = new Map([
 	["noticeRetrievingSS", "Retrieving paper information from Semantic Scholar API."],
 ]);
 
+function compressWhitespace(str: string): string {
+	return str.replace(/\s+/g, " ").trim();
+}
+
 function trimString(str: string | null): string {
 	if (str == null) return "";
 
-	return str.replace(/\s+/g, " ").trim();
+	return compressWhitespace(str);
 }
 
 interface PaperNoteFillerPluginSettings {
@@ -201,14 +205,7 @@ class urlModal extends Modal {
 				let title = json.title;
 				let maybeAbstract: string | null = json.abstract ?? null;
 
-				let authors = json.authors;
-				let authorString = "";
-				for (let i = 0; i < authors.length; i++) {
-					if (i > 0) {
-						authorString += ", ";
-					}
-					authorString += authors[i].name;
-				}
+				const authors = json.authors.map((author: any) => author.name);
 
 				let maybeVenue: string | null = null;
 				if (json.venue != null && json.venue != "") {
@@ -245,7 +242,7 @@ class urlModal extends Modal {
 				} else {
 					await this.app.vault.create(
 							pathToFile,
-							this.buildNoteBody(title, authorString, semanticScholarURL, maybeVenue, maybeDate, maybeAbstract)
+							this.buildNoteBody(title, authors, semanticScholarURL, null /* discoveredVia */, maybeVenue, maybeDate, maybeAbstract)
 						)
 						.then(() => {
 							this.app.workspace.openLinkText(
@@ -266,35 +263,42 @@ class urlModal extends Modal {
 			});
 	}
 
-	buildNoteBody(title: string, authorString: string, url: string, maybeVenue: string | null, maybeDate: string | null, maybeAbstract: string | null): string {
-		return "# Title" +
-			"\n" +
-			trimString(title) +
-			"\n\n" +
-			"# Authors" +
-			"\n" +
-			trimString(authorString) +
-			"\n\n" +
-			"# URL" +
-			"\n" +
-			trimString(url) +
-			"\n\n" +
-			"# Venue" +
-			"\n" +
-			trimString(maybeVenue) +
-			"\n\n" +
-			"# Publication date" +
-			"\n" +
-			trimString(maybeDate) +
-			"\n\n" +
-			"# Abstract" +
-			"\n" +
-			trimString(maybeAbstract) +
-			"\n\n" +
-			"# Tags" +
-			"\n\n" +
-			"# Notes" +
-			"\n\n";
+	buildNoteBody(
+			title: string,
+			authors: string[],
+			url: string,
+			maybeDiscoveredVia: string | null,
+			maybeVenue: string | null,
+			maybeDate: string | null,
+			maybeAbstract: string | null
+	): string {
+			const todayDatestamp = new Date().toISOString().split('T')[0];
+
+			const frontmatter: any = {
+					alias: compressWhitespace(title),
+					created_at: todayDatestamp,
+					url,
+					authors: authors.map((author: string) => `[[${author}]]`),
+					tags: ['paper']
+			};
+
+			// Optional fields
+			if (maybeDiscoveredVia) frontmatter.discovered_via = maybeDiscoveredVia;
+			if (maybeVenue) frontmatter.publication_venue = trimString(maybeVenue);
+			if (maybeDate) frontmatter.date = maybeDate;
+
+			const frontmatterYaml = yaml.dump(frontmatter, { lineWidth: -1 }).trim();
+
+			return `---
+${frontmatterYaml}
+---
+# Abstract
+${maybeAbstract ? maybeAbstract.trim() : ''}
+
+- - -
+
+# Notes
+`;
 	}
 
 	//if semantic scholar misses, we try arxiv
@@ -312,21 +316,13 @@ class urlModal extends Modal {
 				let title =
 					xmlDoc.getElementsByTagName("title")[1].textContent;
 				let maybeAbstract = xmlDoc.getElementsByTagName("summary")[0].textContent;
-				let authors = xmlDoc.getElementsByTagName("author");
-				let authorString = "";
-				for (let i = 0; i < authors.length; i++) {
-					if (i > 0) {
-						authorString += ", ";
-					}
-					authorString +=
-						authors[i].getElementsByTagName("name")[0]
-							.textContent;
-				}
+				const authorObjs = Array.from(xmlDoc.getElementsByTagName("author"));
+				const authorNames: string[] = authorObjs
+					.map((authorObj) => authorObj.getElementsByTagName("name")[0].textContent)
+					.filter((maybeStr) => maybeStr !== null).map((authorName) => authorName!.trim());
 				let maybeVenue = null;
-				let maybeDate: string | null =
-					xmlDoc.getElementsByTagName("published")[0]
-						.textContent;
-				if (maybeDate) maybeDate = maybeDate.split("T")[0]; //make the date human-friendly
+				let maybeDate: string | null = xmlDoc.getElementsByTagName("published")[0].textContent;
+				if (maybeDate) maybeDate = maybeDate.split("T")[0]; // datestamp
 
 				if (title == null) title = "undefined";
 				let filename = this.extractFileNameFromUrl(url, title);
@@ -348,7 +344,7 @@ class urlModal extends Modal {
 				} else {
 					await this.app.vault.create(
 							pathToFile,
-							this.buildNoteBody(title, authorString, url, maybeVenue, maybeDate, maybeAbstract)
+							this.buildNoteBody(title, authorNames, url, null /* discoveredVia */, maybeVenue, maybeDate, maybeAbstract)
 						)
 						.then(() => {
 							this.app.workspace.openLinkText(
