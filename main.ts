@@ -11,7 +11,8 @@ import * as yaml from 'js-yaml';
 const path = require("path");
 
 const DEFAULT_SETTINGS: PaperNoteFillerPluginSettings = {
-	folderLocation: "",
+	folderLocation: "Personal",
+	pdfFolderLocation: "Personal/_resources",
 };
 
 //create a string map for all the strings we need
@@ -41,6 +42,8 @@ const STRING_MAP: Map<string, string> = new Map([
 	["settingFolderName", "Folder"],
 	["settingFolderDesc", "Folder to create paper notes in."],
 	["settingFolderRoot", "(root of the vault)"],
+	["settingPdfFolderName", "PDF Folder"],
+	["settingPdfFolderDesc", "Folder to download PDFs to."],
 	["noticeRetrievingArxiv", "Retrieving paper information from arXiv API."],
 	["noticeRetrievingSS", "Retrieving paper information from Semantic Scholar API."],
 ]);
@@ -57,13 +60,14 @@ function trimString(str: string | null): string {
 
 interface PaperNoteFillerPluginSettings {
 	folderLocation: string;
+	pdfFolderLocation: string;
 }
 
 export default class PaperNoteFillerPlugin extends Plugin {
 	settings: PaperNoteFillerPluginSettings;
 
 	async onload() {
-		console.log("Loading Paper Note Filler plugin.");
+		console.log("Loading Add Paper plugin.");
 
 		await this.loadSettings();
 
@@ -427,5 +431,20 @@ class SettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+
+		new Setting(containerEl)
+			.setName(STRING_MAP.get("settingPdfFolderName")!)
+			.setDesc(STRING_MAP.get("settingPdfFolderDesc")!)
+			/* create dropdown menu with all folders currently in the vault */
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOptions(folderOptions)
+					.setValue(this.plugin.settings.pdfFolderLocation)
+					.onChange(async (value) => {
+						this.plugin.settings.pdfFolderLocation = value;
+						await this.plugin.saveSettings();
+					})
+			)
+
 	}
 }
