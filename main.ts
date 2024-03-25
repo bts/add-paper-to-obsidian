@@ -5,6 +5,7 @@ import {
 	Plugin,
 	PluginSettingTab,
 	Setting,
+	requestUrl,
 } from "obsidian";
 import * as yaml from 'js-yaml';
 
@@ -12,7 +13,8 @@ const path = require("path");
 
 const DEFAULT_SETTINGS: PaperNoteFillerPluginSettings = {
 	folderLocation: "Personal",
-	pdfFolderLocation: "Personal/_resources",
+	downloadPdfs: true,
+	pdfFolderLocation: "Personal/_pdfs",
 };
 
 //create a string map for all the strings we need
@@ -39,6 +41,8 @@ const STRING_MAP: Map<string, string> = new Map([
 	["semanticScholarFields", "fields=authors,title,abstract,url,venue,year,publicationDate,externalIds"],
 	["semanticScholarAPI", "https://api.semanticscholar.org/graph/v1/paper/"],
 	["settingHeader", "Settings to create paper notes."],
+	["settingDownloadPdfs", "Download PDFs"],
+	["settingDownloadPdfsDesc", "Whether to download PDFs"],
 	["settingFolderName", "Folder"],
 	["settingFolderDesc", "Folder to create paper notes in."],
 	["settingFolderRoot", "(root of the vault)"],
@@ -60,6 +64,7 @@ function trimString(str: string | null): string {
 
 interface PaperNoteFillerPluginSettings {
 	folderLocation: string;
+	downloadPdfs: boolean;
 	pdfFolderLocation: string;
 }
 
@@ -136,6 +141,23 @@ class urlModal extends Modal {
         .replace(/:/g, "-");
 	}
 
+	async tryFetchPdf(basename: string, pdfUrl: string): Promise<string | null> {
+		let pdfPath = this.settings.pdfFolderLocation + path.sep + basename + ".pdf";
+
+		if (this.app.vault.getAbstractFileByPath(pdfPath)) {
+			new Notice("PDF already exists: " + pdfPath);
+		} else {
+			console.log("Downloading PDF from " + pdfUrl);
+
+			const pdfResponse = await requestUrl(pdfUrl);
+			const pdfBlob = await pdfResponse.arrayBuffer;
+
+			await this.app.vault.createBinary(pdfPath, pdfBlob);
+			return pdfPath;
+		}
+		return null;
+	}
+
 	//both arxiv and aclanthology papers can be queried via the Semantic Scholar API
 	extractFromSemanticScholar(url: string) {
 
@@ -184,19 +206,18 @@ class urlModal extends Modal {
 				const maybeAlias: string | null = basename !== title ? title : null;
 
 				let semanticScholarURL = json.url;
+				let pdfUrl = null;
 				if (json["externalIds"] && json["externalIds"]["ArXiv"]) {
-					semanticScholarURL += "\n" + "https://arxiv.org/abs/" + json.externalIds["ArXiv"];
+					const arXivId = json.externalIds["ArXiv"];
+					semanticScholarURL += "\n" + "https://arxiv.org/abs/" + arXivId;
+					pdfUrl = "https://arxiv.org/pdf/" + arXivId + ".pdf";
 				}
 				if (json["externalIds"] && json["externalIds"]["ACL]"]) {
 					semanticScholarURL += "\n" + "https://aclanthology.org/" + json.externalIds["ACL"];
 				}
 
-				let pathToFile = this.settings.folderLocation +
-					path.sep +
-					basename +
-					".md";
+				let pathToFile = this.settings.folderLocation + path.sep + basename + ".md";
 
-				//notification if the file already exists
 				if (await this.app.vault.adapter.exists(pathToFile)) {
 					new Notice(
 						STRING_MAP.get("fileAlreadyExists") + ""
@@ -206,9 +227,18 @@ class urlModal extends Modal {
 						pathToFile
 					);
 				} else {
+					let maybePdfPath = null;
+					if (this.settings.downloadPdfs) {
+						if (pdfUrl) {
+							maybePdfPath = await this.tryFetchPdf(basename, pdfUrl);
+						} else {
+							console.log("Skipping PDF download; no PDF URL found.");
+						}
+					}
+
 					await this.app.vault.create(
 							pathToFile,
-							this.buildNoteBody(maybeAlias, authors, semanticScholarURL, null /* discoveredVia */, maybeVenue, maybeDate, maybeAbstract)
+							this.buildNoteBody(maybeAlias, authors, semanticScholarURL, null /* discoveredVia */, maybeVenue, maybeDate, maybeAbstract, maybePdfPath)
 						)
 						.then(() => {
 							this.app.workspace.openLinkText(
@@ -237,7 +267,8 @@ class urlModal extends Modal {
 			maybeDiscoveredVia: string | null,
 			maybeVenue: string | null,
 			maybeDate: string | null,
-			maybeAbstract: string | null
+			maybeAbstract: string | null,
+			maybePdfPath: string | null,
 	): string {
 			const todayDatestamp = new Date().toISOString().split('T')[0];
 
@@ -245,7 +276,8 @@ class urlModal extends Modal {
 					created_at: todayDatestamp,
 					url,
 					authors: authors.map((author: string) => `[[${author}]]`),
-					tags: ['paper']
+					tags: ['paper'],
+					artifacts: maybePdfPath ? [`[[${maybePdfPath}|pdf]]`] : [],
 			};
 
 			// Optional fields
@@ -281,11 +313,21 @@ ${maybeAbstract ? maybeAbstract.trim() : ''}
 				let xmlDoc = parser.parseFromString(data, "text/xml");
 
 				const title = compressWhitespace(xmlDoc.getElementsByTagName("title")[1].textContent ?? 'undefined');
+
 				let maybeAbstract = xmlDoc.getElementsByTagName("summary")[0].textContent;
+
 				const authorObjs = Array.from(xmlDoc.getElementsByTagName("author"));
 				const authorNames: string[] = authorObjs
 					.map((authorObj) => authorObj.getElementsByTagName("name")[0].textContent)
 					.filter((maybeStr) => maybeStr !== null).map((authorName) => authorName!.trim());
+
+				const linkObjs = Array.from(xmlDoc.getElementsByTagName("link"));
+				let pdfLinks = linkObjs.filter((linkObj) => linkObj.getAttribute("title") === "pdf");
+				let maybePdfUrl = null;
+				if (pdfLinks.length > 0) {
+					maybePdfUrl = pdfLinks[0].getAttribute("href");
+				}
+
 				let maybeVenue = null;
 				let maybeDate: string | null = xmlDoc.getElementsByTagName("published")[0].textContent;
 				if (maybeDate) maybeDate = maybeDate.split("T")[0]; // datestamp
@@ -308,9 +350,18 @@ ${maybeAbstract ? maybeAbstract.trim() : ''}
 						pathToFile
 					);
 				} else {
+					let maybePdfPath = null;
+					if (this.settings.downloadPdfs) {
+						if (maybePdfUrl !== null) {
+							maybePdfPath = await this.tryFetchPdf(basename, maybePdfUrl);
+						} else {
+							console.log("Skipping PDF download; no PDF URL found.");
+						}
+					}
+
 					await this.app.vault.create(
 							pathToFile,
-							this.buildNoteBody(maybeAlias, authorNames, url, null /* discoveredVia */, maybeVenue, maybeDate, maybeAbstract)
+							this.buildNoteBody(maybeAlias, authorNames, url, null /* discoveredVia */, maybeVenue, maybeDate, maybeAbstract, maybePdfPath)
 						)
 						.then(() => {
 							this.app.workspace.openLinkText(
@@ -433,6 +484,18 @@ class SettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName(STRING_MAP.get("settingDownloadPdfs")!)
+			.setDesc(STRING_MAP.get("settingDownloadPdfsDesc")!)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.downloadPdfs)
+					.onChange(async (value) => {
+						this.plugin.settings.downloadPdfs = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
 			.setName(STRING_MAP.get("settingPdfFolderName")!)
 			.setDesc(STRING_MAP.get("settingPdfFolderDesc")!)
 			/* create dropdown menu with all folders currently in the vault */
@@ -444,7 +507,7 @@ class SettingTab extends PluginSettingTab {
 						this.plugin.settings.pdfFolderLocation = value;
 						await this.plugin.saveSettings();
 					})
-			)
+			);
 
 	}
 }
