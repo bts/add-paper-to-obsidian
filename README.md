@@ -60,7 +60,11 @@ Press <kbd>Enter</kbd> and a note with the paper title, authors, url, abstract, 
 
 Not hard as the plugin is straightforward and just a few hundred lines of code. Check out the instructions of the [Obsidian Sample Plugin repo](https://github.com/obsidianmd/obsidian-sample-plugin) to get started.
 
+# Brian notes-to-self
+
+## Developing
+
 - make sure all packages are installed via `npm install`
 - build in development with a watcher via `node run dev`
 - build for release via `node run build`
-- deploy to Obsidian, for a vault at e.g. `~/Documents/Notes`, via `cp main.js styles.css manifest.json ~/Documents/Notes/.obsidian/plugins/paper-note-filler`
+- deploy to Obsidian, for a vault at e.g. `~/Documents/Notes`, via `cp main.js styles.css manifest.json ~/Documents/Notes/.obsidian/plugins/add-paper`

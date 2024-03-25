@@ -1,7 +1,7 @@
 {
-	"name": "paper-note-filler",
+	"name": "add-paper-to-obsidian",
 	"version": "1.0.0",
-	"description": "Take an arxiv.org URL and automatically create an Obsidian note from it.",
+	"description": "Add a new Obsidian note for an ArXiv paper",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
