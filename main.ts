@@ -79,8 +79,17 @@ export default class PaperNoteFillerPlugin extends Plugin {
 		this.addCommand({
 			id: STRING_MAP.get("commandId")!,
 			name: STRING_MAP.get("commandName")!,
-			callback: () => {
-				new urlModal(this.app, this.settings).open();
+			callback: async () => {
+				console.log("Adding paper...");
+
+				const url = await this.getClipboardContentAsUrl();
+
+				const modal = new urlModal(this.app, this.settings);
+				if (url != null) {
+					modal.processUrl(url);
+				} else {
+					modal.open();
+				}
 			},
 		});
 
@@ -88,6 +97,16 @@ export default class PaperNoteFillerPlugin extends Plugin {
 	}
 
 	onunload() { }
+
+	async getClipboardContentAsUrl(): Promise<string | null> {
+    try {
+        const clipboardContent = await navigator.clipboard.readText();
+        new URL(clipboardContent);
+        return clipboardContent;
+    } catch (error) {
+        return null;
+    }
+	}
 
 	async loadSettings() {
 		this.settings = Object.assign(
@@ -382,6 +401,17 @@ ${maybeAbstract ? maybeAbstract.trim() : ''}
 			});
 	}
 
+	processUrl(url: string) {
+		if (url.includes("arxiv.org")) {
+			new Notice(STRING_MAP.get("noticeRetrievingArxiv")!);
+			this.extractFromArxiv(url);
+		}
+		else {
+			new Notice(STRING_MAP.get("noticeRetrievingSS")!);
+			this.extractFromSemanticScholar(url);
+		}
+	}
+
 	onOpen() {
 		const { contentEl } = this;
 
@@ -409,14 +439,7 @@ ${maybeAbstract ? maybeAbstract.trim() : ''}
 				extracting = true;
 				console.log("HTTP request: " + url);
 
-				if (url.includes("arxiv.org")) {
-					new Notice(STRING_MAP.get("noticeRetrievingArxiv")!);
-					this.extractFromArxiv(url);
-				}
-				else {
-					new Notice(STRING_MAP.get("noticeRetrievingSS")!);
-					this.extractFromSemanticScholar(url);
-				}
+				this.processUrl(url);
 			}
 		});
 	}
