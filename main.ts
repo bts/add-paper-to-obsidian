@@ -49,7 +49,7 @@ const STRING_MAP: Map<string, string> = new Map([
 	["settingPdfFolderName", "PDF Folder"],
 	["settingPdfFolderDesc", "Folder to download PDFs to."],
 	["noticeRetrievingArxiv", "Retrieving paper information from arXiv API."],
-	["noticeRetrievingSS", "Retrieving paper information from Semantic Scholar API."],
+	["nonArxiv", "URL does not pertain to a paper from the arXiv."],
 ]);
 
 function compressWhitespace(str: string): string {
@@ -183,107 +183,6 @@ class urlModal extends Modal {
 		return null;
 	}
 
-	//both arxiv and aclanthology papers can be queried via the Semantic Scholar API
-	extractFromSemanticScholar(url: string) {
-
-		let id = this.getIdentifierFromUrl(url);
-		console.log("paper id: " + id);
-
-		let suffix = "INVALID";
-		if (url.toLowerCase().includes("arxiv"))
-			suffix = STRING_MAP.get("arxivUrlSuffix")!;
-		else if (url.toLowerCase().includes("aclanthology"))
-			suffix = STRING_MAP.get("aclAnthologyUrlSuffix")!;
-		else if (url.toLowerCase().includes("semanticscholar"))
-			suffix = "";
-		else;
-
-		if (suffix === "INVALID") {
-			console.log("Invalid url: " + url);
-			new Notice("Error: For now, only semanticscholar, arxiv and anthology URLs are supported.");
-			return;
-		}
-
-		fetch(STRING_MAP.get("semanticScholarAPI")! + suffix + id + "?" + STRING_MAP.get("semanticScholarFields")!)
-			.then((response) => response.text())
-			.then(async (data) => {
-
-				let json = JSON.parse(data);
-
-				if (json.error != null) {
-					new Notice("Error: " + json.error);
-					return;
-				}
-
-				const title = compressWhitespace(json.title ?? 'undefined');
-				let maybeAbstract: string | null = json.abstract ?? null;
-
-				const authors = json.authors.map((author: any) => author.name);
-
-				let maybeVenue: string | null = null;
-				if (json.venue != null && json.venue != "") {
-					maybeVenue = json.venue + " " + json.year;
-				}
-
-				let maybeDate: string | null = json.publicationDate ?? null;
-
-				let basename = this.buildNoteName(title);
-				const maybeAlias: string | null = basename !== title ? title : null;
-
-				let semanticScholarURL = json.url;
-				let pdfUrl = null;
-				if (json["externalIds"] && json["externalIds"]["ArXiv"]) {
-					const arXivId = json.externalIds["ArXiv"];
-					semanticScholarURL += "\n" + "https://arxiv.org/abs/" + arXivId;
-					pdfUrl = "https://arxiv.org/pdf/" + arXivId + ".pdf";
-				}
-				if (json["externalIds"] && json["externalIds"]["ACL]"]) {
-					semanticScholarURL += "\n" + "https://aclanthology.org/" + json.externalIds["ACL"];
-				}
-
-				let pathToFile = this.settings.folderLocation + path.sep + basename + ".md";
-
-				if (await this.app.vault.adapter.exists(pathToFile)) {
-					new Notice(
-						STRING_MAP.get("fileAlreadyExists") + ""
-					);
-					this.app.workspace.openLinkText(
-						pathToFile,
-						pathToFile
-					);
-				} else {
-					let maybePdfPath = null;
-					if (this.settings.downloadPdfs) {
-						if (pdfUrl) {
-							maybePdfPath = await this.tryFetchPdf(basename, pdfUrl);
-						} else {
-							console.log("Skipping PDF download; no PDF URL found.");
-						}
-					}
-
-					await this.app.vault.create(
-							pathToFile,
-							this.buildNoteBody(maybeAlias, authors, semanticScholarURL, null /* discoveredVia */, maybeVenue, maybeDate, maybeAbstract, maybePdfPath)
-						)
-						.then(() => {
-							this.app.workspace.openLinkText(
-								pathToFile,
-								pathToFile
-							);
-						});
-				}
-			})
-			.catch((error) => {
-				//convert the Notice to a notice with a red background
-				new Notice(STRING_MAP.get("error")!);
-
-				console.log(error);
-			})
-			.finally(() => {
-				this.close();
-			});
-	}
-
 	// TODO(bts): take a params object
 	buildNoteBody(
 			maybeAlias: string | null,
@@ -414,10 +313,8 @@ ${maybeAbstract ? maybeAbstract.trim() : ''}
 		if (url.includes("arxiv.org")) {
 			new Notice(STRING_MAP.get("noticeRetrievingArxiv")!);
 			this.extractFromArxiv(url);
-		}
-		else {
-			new Notice(STRING_MAP.get("noticeRetrievingSS")!);
-			this.extractFromSemanticScholar(url);
+		} else {
+			new Notice(STRING_MAP.get("nonArxiv")!);
 		}
 	}
 
