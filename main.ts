@@ -325,13 +325,16 @@ ${maybeAbstract ? maybeAbstract.trim() : ''}
 `;
 	}
 
-	//if semantic scholar misses, we try arxiv
 	extractFromArxiv(url: string) {
-
 		let id = this.getIdentifierFromUrl(url);
 
 		fetch(STRING_MAP.get("arXivRestAPI")! + id)
-			.then((response) => response.text())
+			.then((response) => {
+				if (!response.ok) {
+						throw new Error(`HTTP error: status ${response.status}`);
+				}
+				return response.text();
+			})
 			.then(async (data) => {
 				//parse the XML
 				let parser = new DOMParser();
@@ -400,7 +403,7 @@ ${maybeAbstract ? maybeAbstract.trim() : ''}
 				//convert the Notice to a notice with a red background
 				new Notice(STRING_MAP.get("error")!);
 
-				console.log(error);
+				console.error(error);
 			})
 			.finally(() => {
 				this.close();
