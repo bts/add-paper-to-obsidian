@@ -148,7 +148,13 @@ class urlModal extends Modal {
 		//if url ends in / remove it
 		if (url.endsWith("/"))
 			url = url.slice(0, -1);
-		return url.split("/").slice(-1)[0];
+		const path = url.split("/").slice(-1)[0];
+
+		if (path.endsWith(".pdf")) {
+			return path.slice(0, -4);
+		} else {
+			return path;
+		}
 	}
 
 	buildNoteName(title: string): string {
