@@ -65,7 +65,7 @@ Not hard as the plugin is straightforward and just a few hundred lines of code. 
 ## Developing
 
 - make sure all packages are installed via `npm install`
-- build in development with a watcher via `node run dev`
-- build for release via `node run build`
+- build in development with a watcher via `npm run dev`
+- build for release via `npm run build`
 - deploy to Obsidian, for a vault at e.g. `~/Documents/Notes`, via `cp main.js styles.css manifest.json ~/Documents/Notes/.obsidian/plugins/add-paper`
 - invoke the plugin manually on desktop by running `open "obsidian://actions-uri/command/execute?vault=Notes&commands=add-paper%3Aurl-to-paper-note"`
