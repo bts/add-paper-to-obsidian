@@ -164,7 +164,7 @@ class urlModal extends Modal {
 		let pdfPath = this.settings.pdfFolderLocation + path.sep + basename + ".pdf";
 
 		if (this.app.vault.getAbstractFileByPath(pdfPath)) {
-			new Notice("PDF already exists: " + pdfPath);
+			new Notice("Reusing existing PDF: " + pdfPath);
 			return pdfPath;
 		} else {
 			console.log("Downloading PDF from " + pdfUrl);
