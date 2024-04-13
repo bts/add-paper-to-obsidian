@@ -244,7 +244,11 @@ ${maybeAbstract ? maybeAbstract.trim() : ''}
 				let pdfLinks = linkObjs.filter((linkObj) => linkObj.getAttribute("title") === "pdf");
 				let maybePdfUrl = null;
 				if (pdfLinks.length > 0) {
-					maybePdfUrl = pdfLinks[0].getAttribute("href");
+					const rawUrl = pdfLinks[0].getAttribute("href");
+					if (rawUrl !== null) {
+						// Arxiv URLs are HTTP, but we need to force https on iOS
+						maybePdfUrl = rawUrl.replace(/^http:/, 'https:');
+					}
 				}
 
 				let maybeVenue = null;
