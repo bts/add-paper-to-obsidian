@@ -1,5 +1,5 @@
 {
-	"name": "add-paper-to-obsidian",
+	"name": "obsidian-add-arxiv-paper",
 	"version": "1.0.0",
 	"description": "Add a new Obsidian note for an ArXiv paper",
 	"main": "main.js",
