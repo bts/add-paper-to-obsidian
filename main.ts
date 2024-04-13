@@ -292,9 +292,10 @@ ${maybeAbstract ? maybeAbstract.trim() : ''}
 				}
 			})
 			.catch((error) => {
-				//convert the Notice to a notice with a red background
 				new Notice(STRING_MAP.get("error")!);
 
+				console.error("Error message:", error.message);
+				console.error("Error stack:", error.stack);
 				console.error(error);
 			})
 			.finally(() => {
