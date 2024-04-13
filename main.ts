@@ -173,7 +173,6 @@ class urlModal extends Modal {
 			await this.app.vault.createBinary(pdfPath, pdfBlob);
 			return pdfPath;
 		}
-		return null;
 	}
 
 	// TODO(bts): take a params object
