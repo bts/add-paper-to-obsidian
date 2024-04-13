@@ -9,8 +9,6 @@ import {
 } from "obsidian";
 import * as yaml from 'js-yaml';
 
-const path = require("path");
-
 const DEFAULT_SETTINGS: PaperNoteFillerPluginSettings = {
 	folderLocation: "Personal",
 	downloadPdfs: true,
@@ -161,7 +159,7 @@ class urlModal extends Modal {
 	}
 
 	async tryFetchPdf(basename: string, pdfUrl: string): Promise<string | null> {
-		let pdfPath = this.settings.pdfFolderLocation + path.sep + basename + ".pdf";
+		let pdfPath = this.settings.pdfFolderLocation + "/" + basename + ".pdf";
 
 		if (this.app.vault.getAbstractFileByPath(pdfPath)) {
 			new Notice("Reusing existing PDF: " + pdfPath);
@@ -257,10 +255,7 @@ ${maybeAbstract ? maybeAbstract.trim() : ''}
 				const basename = this.buildNoteName(title);
 				const maybeAlias: string | null = basename !== title ? title : null;
 
-				let pathToFile = this.settings.folderLocation +
-					path.sep +
-					basename +
-					".md";
+				let pathToFile = this.settings.folderLocation + "/" + basename + ".md";
 
 				//notification if the file already exists
 				if (await this.app.vault.adapter.exists(pathToFile)) {
@@ -369,13 +364,13 @@ class SettingTab extends PluginSettingTab {
 		let folders = this.app.vault
 			.getFiles()
 			.map((file) => {
-				let parts = file.path.split(path.sep);
+				let parts = file.path.split("/");
 				parts.pop(); //ignore the filename
 
 				//now return all path combinations
 				let res: string[] = [];
 				for (let i = 0; i < parts.length; i++) {
-					res.push(parts.slice(0, i + 1).join(path.sep));
+					res.push(parts.slice(0, i + 1).join("/"));
 				}
 				return res;
 			}
