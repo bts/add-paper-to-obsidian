@@ -29,17 +29,11 @@ const STRING_MAP: Map<string, string> = new Map([
 	],
 	["commandId", "url-to-paper-note"],
 	["commandName", "Create paper note from URL."],
-	["inputLabel1", "Enter a valid URL."],
+	["inputLabel1", "Enter an arXiv URL."],
 	["inputLabel2", "Here are some examples: "],
 	["arXivRestAPI", "https://export.arxiv.org/api/query?id_list="],
-	["aclAnthologyUrlExample", "https://aclanthology.org/2022.acl-long.1/"],
 	["arXivUrlExample", "https://arxiv.org/abs/0000.00000"],
-	["semanticScholarUrlExample", "https://www.semanticscholar.org/paper/some-text/0000.00000"],
 	["inputPlaceholder", "https://my-url.com"],
-	["arxivUrlSuffix", "arXiv:"],
-	["aclAnthologyUrlSuffix", "ACL:"],
-	["semanticScholarFields", "fields=authors,title,abstract,url,venue,year,publicationDate,externalIds"],
-	["semanticScholarAPI", "https://api.semanticscholar.org/graph/v1/paper/"],
 	["settingHeader", "Settings to create paper notes."],
 	["settingDownloadPdfs", "Download PDFs"],
 	["settingDownloadPdfsDesc", "Whether to download PDFs"],
@@ -324,9 +318,7 @@ ${maybeAbstract ? maybeAbstract.trim() : ''}
 
 		this.addTextElementToModal("h2", STRING_MAP.get("inputLabel1")!);
 		this.addTextElementToModal("p", STRING_MAP.get("inputLabel2")!);
-		this.addTextElementToModal("p", STRING_MAP.get("aclAnthologyUrlExample")!);
 		this.addTextElementToModal("p", STRING_MAP.get("arXivUrlExample")!);
-		this.addTextElementToModal("p", STRING_MAP.get("semanticScholarUrlExample")!);
 
 		let input = this.addInputElementToModal("input");
 		this.addPropertyToElement(input, "type", "search");
