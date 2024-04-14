@@ -216,10 +216,13 @@ ${maybeAbstract ? maybeAbstract.trim() : ''}
 `;
 	}
 
-	extractFromArxiv(url: string) {
-		let id = this.getIdentifierFromUrl(url);
+	extractFromArxiv(rawUrl: string) {
+		let id = this.getIdentifierFromUrl(rawUrl);
+		const url = STRING_MAP.get("arXivRestAPI")! + id;
 
-		fetch(STRING_MAP.get("arXivRestAPI")! + id)
+		console.log("fetching from API: " + url);
+
+		fetch(url)
 			.then((response) => {
 				if (!response.ok) {
 						throw new Error(`HTTP error: status ${response.status}`);
